@@ -1,0 +1,85 @@
+Stage (a): Import Required Libraries
+
+# Step a: Import required libraries
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras import regularizers
+
+
+Stage (b): Upload / Access the Dataset
+
+# Step b: Load and preprocess the dataset
+(x_train, _), (x_test, _) = mnist.load_data()
+
+# Normalize data between 0 and 1
+x_train = x_train.astype('float32') / 255.
+x_test = x_test.astype('float32') / 255.
+
+# Flatten 28x28 images into 784-dimensional vectors
+x_train = x_train.reshape((len(x_train), np.prod(x_train.shape[1:])))
+x_test = x_test.reshape((len(x_test), np.prod(x_test.shape[1:])))
+
+print("Training data shape:", x_train.shape)
+print("Testing data shape:", x_test.shape)
+
+
+Stage (c): Encoder Converts Input into Latent Representation
+
+# Step c: Define the Encoder
+input_img = Input(shape=(784,))
+encoded = Dense(128, activation='relu')(input_img)
+encoded = Dense(64, activation='relu')(encoded)
+encoded = Dense(32, activation='relu')(encoded)
+
+
+Stage (d): Decoder Converts Latent Data Back to Original
+
+# Step d: Define the Decoder
+decoded = Dense(64, activation='relu')(encoded)
+decoded = Dense(128, activation='relu')(decoded)
+decoded = Dense(784, activation='sigmoid')(decoded)
+
+# Combine Encoder + Decoder
+autoencoder = Model(input_img, decoded)
+
+
+
+Stage (e): Compile and Train the Model
+
+
+# Step e: Compile and Train the model
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+history = autoencoder.fit(x_train, x_train,
+                          epochs=20,
+                          batch_size=256,
+                          shuffle=True,
+                          validation_data=(x_test, x_test))
+
+
+Visualizing the Results
+
+
+# Predict reconstructed images
+decoded_imgs = autoencoder.predict(x_test)
+
+# Show original vs reconstructed
+n = 10  # number of images to display
+plt.figure(figsize=(20, 4))
+for i in range(n):
+    # Original
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i].reshape(28, 28))
+    plt.gray()
+    ax.axis('off')
+
+    # Reconstructed
+    ax = plt.subplot(2, n, i + 1 + n)
+    plt.imshow(decoded_imgs[i].reshape(28, 28))
+    plt.gray()
+    ax.axis('off')
+
+plt.show()
