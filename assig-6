@@ -1,0 +1,103 @@
+Step (a): Load a Pre-trained CNN Model
+
+# Step a: Load in a pre-trained CNN model trained on a large dataset
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
+
+# Load MobileNetV2 (trained on ImageNet)
+# include_top=False means we exclude the final classifier layer
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Show base model summary
+base_model.summary()
+
+
+Step (b): Freeze Lower Convolutional Layers
+
+# Step b: Freeze parameters (weights) in lower convolutional layers
+for layer in base_model.layers:
+    layer.trainable = False
+
+
+Step (c): Add Custom Classifier
+
+# Step c: Add custom classifier on top of base model
+x = base_model.output
+x = GlobalAveragePooling2D()(x)  # converts features into 1D vector
+x = Dense(128, activation='relu')(x)
+x = Dropout(0.5)(x)
+predictions = Dense(2, activation='softmax')(x)  # change '2' to number of classes you have
+
+model = Model(inputs=base_model.input, outputs=predictions)
+
+# Print full model summary
+model.summary()
+
+
+Step (d): Train the Classifier Layers
+
+# Step d: Train classifier layers on your custom dataset
+
+# Prepare image generators
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=20,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    validation_split=0.2
+)
+
+train_generator = train_datagen.flow_from_directory(
+    'dataset_path/train',  # replace with your training folder path
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='training'
+)
+
+val_generator = train_datagen.flow_from_directory(
+    'dataset_path/train',
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode='categorical',
+    subset='validation'
+)
+
+# Compile model
+model.compile(optimizer=Adam(learning_rate=0.001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train only the top layers
+history = model.fit(train_generator,
+                    epochs=5,
+                    validation_data=val_generator)
+
+
+Step (e): Fine-Tune Hyperparameters and Unfreeze Layers
+
+# Step e: Fine-tuning – unfreeze some deeper layers
+for layer in base_model.layers[-20:]:  # unfreeze last 20 layers
+    layer.trainable = True
+
+# Re-compile with a smaller learning rate for fine-tuning
+model.compile(optimizer=Adam(learning_rate=0.0001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Continue training (fine-tuning)
+history_finetune = model.fit(train_generator,
+                             epochs=3,
+                             validation_data=val_generator)
+
+
+Optional: Evaluate the Model
+
+# Evaluate performance
+loss, acc = model.evaluate(val_generator)
+print(f"Validation Accuracy: {acc*100:.2f}%")
+
+
