@@ -1,0 +1,70 @@
+(a) Data Preparation
+
+# Step a: Data Preparation
+import numpy as np
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import skipgrams
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Lambda, Dense
+import tensorflow.keras.backend as K
+
+# Sample corpus (text data)
+corpus = ["the quick brown fox jumped over the lazy dog"]
+
+# Tokenize the words (convert to numbers)
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(corpus)
+word2idx = tokenizer.word_index
+idx2word = {v: k for k, v in word2idx.items()}
+vocab_size = len(word2idx) + 1  # +1 for padding (if any)
+
+print("Vocabulary:", word2idx)
+print("Vocabulary size:", vocab_size)
+
+
+(b) Generate Training Data
+
+# Step b: Generate training data
+# Convert text to sequences of word IDs
+word_sequences = tokenizer.texts_to_sequences(corpus)[0]
+
+# Generate skip-gram pairs (context, target)
+pairs, labels = skipgrams(
+    word_sequences, 
+    vocabulary_size=vocab_size, 
+    window_size=2
+)
+
+print("Example pairs (context, target):", pairs[:5])
+print("Labels:", labels[:5])
+
+
+(c) Train the Model
+
+# Step c: Train the Model
+embedding_dim = 8  # size of word vectors
+
+# Build CBOW-like model
+model = Sequential()
+model.add(Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=1))
+model.add(Lambda(lambda x: K.mean(x, axis=1), output_shape=(embedding_dim,)))
+model.add(Dense(vocab_size, activation='softmax'))
+
+# Compile the model
+model.compile(loss='sparse_categorical_crossentropy', optimizer='adam')
+
+# Prepare data
+contexts = np.array([x[0] for x in pairs])
+targets = np.array([x[1] for x in pairs])
+
+# Train
+model.fit(contexts, targets, epochs=100, verbose=1)
+
+
+(d) Output (Word Relationships)
+
+# Step d: Output word embeddings
+embeddings = model.layers[0].get_weights()[0]
+
+for word, i in word2idx.items():
+    print(f"{word}: {embeddings[i]}")
